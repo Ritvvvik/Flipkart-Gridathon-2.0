@@ -25,6 +25,36 @@ from sklearn.preprocessing import OrdinalEncoder
 TARGET = "demand"
 ID_COL = "Index"
 RANDOM_STATE = 42
+MISSING_CATEGORY = "__missing__"
+
+
+def stringify_categorical(series: pd.Series) -> pd.Series:
+    """Return a categorical series containing only plain Python strings.
+
+    Pandas string columns keep missing values as ``pd.NA``. Scikit-learn
+    encoders sort category values internally and can crash when a column mixes
+    ``pd.NA`` with strings, so every categorical path normalises missing values
+    before model encoding.
+    """
+    return series.astype("string").fillna(MISSING_CATEGORY).astype(str)
+
+
+def categorical_columns(frame: pd.DataFrame, excluded: set[str] | None = None) -> list[str]:
+    excluded = excluded or set()
+    return [
+        col
+        for col in frame.columns
+        if col not in excluded and (frame[col].dtype == "object" or str(frame[col].dtype).startswith("string"))
+    ]
+
+
+def normalize_categorical_columns(train: pd.DataFrame, test: pd.DataFrame, columns: Iterable[str]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    train_out = train.copy()
+    test_out = test.copy()
+    for col in columns:
+        train_out[col] = stringify_categorical(train_out[col])
+        test_out[col] = stringify_categorical(test_out[col])
+    return train_out, test_out
 
 
 def read_dataset(data_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame | None]:
@@ -64,10 +94,10 @@ def add_frequency_features(train: pd.DataFrame, test: pd.DataFrame, columns: Ite
     test_out = test.copy()
     combined = pd.concat([train_out[list(columns)], test_out[list(columns)]], axis=0, ignore_index=True)
     for col in columns:
-        freq = combined[col].astype("string").fillna("__missing__").value_counts(dropna=False)
+        freq = stringify_categorical(combined[col]).value_counts(dropna=False)
         feature = f"{col}_frequency"
-        train_out[feature] = train_out[col].astype("string").fillna("__missing__").map(freq).astype("float32")
-        test_out[feature] = test_out[col].astype("string").fillna("__missing__").map(freq).astype("float32")
+        train_out[feature] = stringify_categorical(train_out[col]).map(freq).astype("float32")
+        test_out[feature] = stringify_categorical(test_out[col]).map(freq).astype("float32")
     return train_out, test_out
 
 
@@ -75,20 +105,20 @@ def add_interaction_keys(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     base_signature_cols = [col for col in out.columns if col not in {TARGET, ID_COL}]
     if base_signature_cols:
-        out["context_signature"] = out[base_signature_cols].astype("string").fillna("__missing__").agg("|".join, axis=1)
+        out["context_signature"] = out[base_signature_cols].apply(stringify_categorical).agg("|".join, axis=1)
     if {"geohash", "timestamp_hour"}.issubset(out.columns):
-        out["geohash_hour"] = out["geohash"].astype("string") + "_" + out["timestamp_hour"].astype("string")
+        out["geohash_hour"] = stringify_categorical(out["geohash"]) + "_" + stringify_categorical(out["timestamp_hour"])
     if {"geohash", "day", "timestamp_hour"}.issubset(out.columns):
         out["geohash_day_hour"] = (
-            out["geohash"].astype("string") + "_" + out["day"].astype("string") + "_" + out["timestamp_hour"].astype("string")
+            stringify_categorical(out["geohash"]) + "_" + stringify_categorical(out["day"]) + "_" + stringify_categorical(out["timestamp_hour"])
         )
     if {"RoadType", "NumberOfLanes", "LargeVehicles"}.issubset(out.columns):
         out["road_lane_vehicle"] = (
-            out["RoadType"].astype("string")
+            stringify_categorical(out["RoadType"])
             + "_"
-            + out["NumberOfLanes"].astype("string")
+            + stringify_categorical(out["NumberOfLanes"])
             + "_"
-            + out["LargeVehicles"].astype("string")
+            + stringify_categorical(out["LargeVehicles"])
         )
     return out
 
@@ -122,7 +152,8 @@ def add_cv_target_encoding(
 def prepare_features(train: pd.DataFrame, test: pd.DataFrame, n_splits: int, smoothing: float) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
     train = add_interaction_keys(add_time_features(train))
     test = add_interaction_keys(add_time_features(test))
-    categorical = [col for col in train.columns if col != TARGET and (train[col].dtype == "object" or str(train[col].dtype).startswith("string"))]
+    categorical = categorical_columns(train, excluded={TARGET})
+    train, test = normalize_categorical_columns(train, test, [col for col in categorical if col in test.columns])
     train, test = add_frequency_features(train, test, categorical)
     target_encoded = [col for col in categorical if col in test.columns]
     train, test = add_cv_target_encoding(train, test, target_encoded, n_splits=n_splits, smoothing=smoothing)
@@ -134,12 +165,17 @@ def prepare_features(train: pd.DataFrame, test: pd.DataFrame, n_splits: int, smo
 
 
 def make_numeric_matrix(X: pd.DataFrame, X_test: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    categorical = [col for col in X.columns if X[col].dtype == "object" or str(X[col].dtype).startswith("string")]
+    categorical = sorted(set(categorical_columns(X)).union(categorical_columns(X_test)))
     numeric = [col for col in X.columns if col not in categorical]
 
     encoder = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1, encoded_missing_value=-1)
-    X_cat = pd.DataFrame(encoder.fit_transform(X[categorical].astype("string")), columns=categorical, index=X.index) if categorical else pd.DataFrame(index=X.index)
-    T_cat = pd.DataFrame(encoder.transform(X_test[categorical].astype("string")), columns=categorical, index=X_test.index) if categorical else pd.DataFrame(index=X_test.index)
+    if categorical:
+        X_norm, X_test_norm = normalize_categorical_columns(X, X_test, categorical)
+        X_cat = pd.DataFrame(encoder.fit_transform(X_norm[categorical]), columns=categorical, index=X.index)
+        T_cat = pd.DataFrame(encoder.transform(X_test_norm[categorical]), columns=categorical, index=X_test.index)
+    else:
+        X_cat = pd.DataFrame(index=X.index)
+        T_cat = pd.DataFrame(index=X_test.index)
 
     X_num = X[numeric].apply(pd.to_numeric, errors="coerce")
     T_num = X_test[numeric].apply(pd.to_numeric, errors="coerce")
