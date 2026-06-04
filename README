@@ -1,1 +1,49 @@
-# ML challange
+# ML Challenge: Traffic Demand Prediction
+
+This repository contains a reproducible solution template for the Gridathon-style traffic
+/ passenger demand prediction challenge.
+
+## Repository contents
+
+- `src/traffic_demand_solution.py` - end-to-end feature engineering, cross-validation,
+  model training, ensembling, and submission generation.
+- `requirements.txt` - Python dependencies needed to run the solution.
+- `docs/APPROACH.txt` - high-level modelling approach for evaluators.
+- `docs/METHODS_USED.txt` - feature engineering, models, validation, and reproducibility
+  details.
+- `docs/EVALUATOR_NOTES.txt` - concise run instructions and output descriptions.
+- `scripts/create_submission.sh` - one-command wrapper that creates `submission.csv` once
+  the competition CSV files are present.
+
+## Quick start
+
+Place the competition files in a local `dataset/` folder:
+
+```text
+dataset/train.csv
+dataset/test.csv
+dataset/sample_submission.csv
+```
+
+Install dependencies and run:
+
+```bash
+pip install -r requirements.txt
+python src/traffic_demand_solution.py --data-dir dataset --output submission.csv --cv-report cv_report.csv
+# or use the convenience wrapper:
+bash scripts/create_submission.sh dataset submission.csv cv_report.csv
+```
+
+The script writes:
+
+- `submission.csv` for leaderboard upload.
+- `cv_report.csv` with fold-level R2 diagnostics.
+
+## Practical note about 100% accuracy
+
+The evaluation metric is R2 scaled by 100, so a score of 100 requires essentially perfect
+reconstruction of the hidden target. This is only possible when the target is deterministic
+from the provided columns, when train/test contain exploitable repeated patterns, or when a
+competition-specific leakage pattern exists. The included solution is designed to capture
+legitimate high-cardinality location/time/road patterns while keeping local validation
+leakage-safe.
