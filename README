@@ -47,3 +47,21 @@ from the provided columns, when train/test contain exploitable repeated patterns
 competition-specific leakage pattern exists. The included solution is designed to capture
 legitimate high-cardinality location/time/road patterns while keeping local validation
 leakage-safe.
+
+## Troubleshooting
+
+### `TypeError: Encoders require their input argument must be uniformly strings or numbers`
+
+This error means scikit-learn's `OrdinalEncoder` received a categorical column with a
+mix of real strings and pandas missing values (`pd.NA`). The current pipeline normalises
+categorical values before encoding, so make sure your local copy of
+`src/traffic_demand_solution.py` includes the `normalize_categorical_columns(...)` call
+inside `make_numeric_matrix(...)`. Then rerun:
+
+```bash
+python src/traffic_demand_solution.py --data-dir dataset --output submission.csv --cv-report cv_report.csv
+```
+
+If your traceback still shows `X[categorical].astype("string")` inside
+`make_numeric_matrix`, you are running an older copy of the file. Replace it with the
+latest version from this repository.
