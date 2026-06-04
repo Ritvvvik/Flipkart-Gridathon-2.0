@@ -1,0 +1,38 @@
+Methods Used
+============
+
+Feature Engineering
+-------------------
+* Datetime expansion: hour, minute, weekday, month, day-of-year, weekend indicator, and
+  unix timestamp seconds.
+* Cyclic time encoding: sine and cosine of hour so 23:00 and 00:00 are close.
+* Exact context signature: full non-target row context for duplicate-pattern recovery.
+* Location-time interactions: geohash_hour and geohash_day_hour.
+* Road interactions: RoadType_NumberOfLanes_LargeVehicles style combined key.
+* Category frequency encoding: frequency of every categorical value across train+test.
+* Smoothed K-fold target encoding: mean demand by category, regularised toward the
+  global mean and generated out-of-fold for training rows.
+
+Models
+------
+* ExtraTreesRegressor: captures sharp, repeated, high-cardinality patterns.
+* RandomForestRegressor: robust bagging baseline that handles noisy tabular features well.
+* HistGradientBoostingRegressor: gradient-boosted model for smooth interactions between
+  time, weather, road, and encoded location features.
+* Simple average ensemble: reduces model-specific errors without overfitting a small
+  validation split.
+
+Validation
+----------
+* KFold cross-validation with a fixed random seed is used for out-of-fold R2 estimates.
+* Target encoding is recalculated inside each fold to prevent validation labels from
+  leaking into validation features.
+* The script writes cv_report.csv so evaluators can inspect fold-level and overall R2.
+
+Reproducibility
+---------------
+* Fixed RANDOM_STATE = 42.
+* Requirements are listed in requirements.txt.
+* The command below regenerates both the submission and validation report:
+
+    python src/traffic_demand_solution.py --data-dir dataset --output submission.csv --cv-report cv_report.csv
