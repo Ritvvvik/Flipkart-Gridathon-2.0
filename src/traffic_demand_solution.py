@@ -57,6 +57,11 @@ def normalize_categorical_columns(train: pd.DataFrame, test: pd.DataFrame, colum
     return train_out, test_out
 
 
+def parse_datetime_column(series: pd.Series) -> pd.Series:
+    """Parse mixed-format datetime columns without pandas format-inference warnings."""
+    return pd.to_datetime(series, errors="coerce", format="mixed")
+
+
 def read_dataset(data_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame | None]:
     train_path = data_dir / "train.csv"
     test_path = data_dir / "test.csv"
@@ -70,7 +75,7 @@ def read_dataset(data_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFra
 def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     if "timestamp" in out.columns:
-        ts = pd.to_datetime(out["timestamp"], errors="coerce")
+        ts = parse_datetime_column(out["timestamp"])
         out["timestamp_hour"] = ts.dt.hour
         out["timestamp_minute"] = ts.dt.minute
         out["timestamp_dayofweek"] = ts.dt.dayofweek
@@ -82,7 +87,7 @@ def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
         out["hour_sin"] = np.sin(2 * np.pi * out["timestamp_hour"].fillna(0) / 24)
         out["hour_cos"] = np.cos(2 * np.pi * out["timestamp_hour"].fillna(0) / 24)
     if "day" in out.columns:
-        day_as_dt = pd.to_datetime(out["day"], errors="coerce")
+        day_as_dt = parse_datetime_column(out["day"])
         out["day_dayofweek"] = day_as_dt.dt.dayofweek
         out["day_month"] = day_as_dt.dt.month
         out["day_dayofyear"] = day_as_dt.dt.dayofyear
