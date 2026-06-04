@@ -12,8 +12,6 @@ This repository contains a reproducible solution template for the Gridathon-styl
 - `docs/METHODS_USED.txt` - feature engineering, models, validation, and reproducibility
   details.
 - `docs/EVALUATOR_NOTES.txt` - concise run instructions and output descriptions.
-- `scripts/create_submission.sh` - one-command wrapper that creates `submission.csv` once
-  the competition CSV files are present.
 
 ## Quick start
 
@@ -30,8 +28,6 @@ Install dependencies and run:
 ```bash
 pip install -r requirements.txt
 python src/traffic_demand_solution.py --data-dir dataset --output submission.csv --cv-report cv_report.csv
-# or use the convenience wrapper:
-bash scripts/create_submission.sh dataset submission.csv cv_report.csv
 ```
 
 The script writes:

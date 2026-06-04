@@ -19,10 +19,6 @@ How to Run
 
        python src/traffic_demand_solution.py --data-dir dataset --output submission.csv --cv-report cv_report.csv
 
-   Or use the convenience wrapper:
-
-       bash scripts/create_submission.sh dataset submission.csv cv_report.csv
-
 Expected Outputs
 ----------------
 * submission.csv: file to upload to the competition platform.
