@@ -1,0 +1,60 @@
+Gridathon Traffic Demand Prediction - Approach
+==============================================
+
+Objective
+---------
+Predict the `demand` value for each row in test.csv. The public metric is:
+
+    score = max(0, 100 * r2_score(actual, predicted))
+
+This means the leaderboard rewards explaining all variance in the target. A score near
+100 requires predictions that are almost identical to the hidden target values.
+
+Data Understanding
+------------------
+The dataset describes traffic or passenger-demand context at a location and time. The
+available predictors are:
+
+* Index: row identifier.
+* geohash: encoded geographic location.
+* day and timestamp: temporal information.
+* RoadType, NumberOfLanes, LargeVehicles, Landmarks: road and location attributes.
+* Temperature and Weather: environmental attributes.
+* demand: regression target in train.csv only.
+
+Model Strategy
+--------------
+The submitted solution uses a reproducible supervised-learning pipeline:
+
+1. Parse temporal fields into hour, minute, day-of-week, month, day-of-year, weekend,
+   epoch-seconds, and cyclic hour sine/cosine features.
+2. Create an exact context signature plus interaction keys such as geohash-hour,
+   geohash-day-hour, and road-lane-vehicle. These capture repeated local demand
+   patterns and exact duplicate contexts when they appear legitimately in train/test.
+3. Add frequency-count features for categorical values. This helps models distinguish
+   common locations and road configurations from rare ones.
+4. Add leakage-safe K-fold target encodings for categorical and interaction columns. For
+   every training fold, encodings are computed only from the other folds; test encodings
+   are computed from the full training data with smoothing.
+5. Ordinal-encode remaining categorical columns and median-impute missing numeric values.
+6. Train three complementary tree-based regressors:
+   * ExtraTreesRegressor for high-variance memorisation of repeated local patterns.
+   * RandomForestRegressor for stable bagged-tree predictions.
+   * HistGradientBoostingRegressor for smooth non-linear trends.
+7. Average model predictions to reduce fold/model variance and write submission.csv in
+   the same format as sample_submission.csv.
+
+Why This Can Reach a Very High Score
+------------------------------------
+Many competitions with 100% public scores contain deterministic or near-deterministic
+patterns: repeated geohashes, repeated timestamps, duplicated full row contexts, road/weather contexts, or a
+row order that is strongly correlated with the target. The pipeline intentionally keeps
+Index, time, geohash, and interaction features available to the model so it can learn such
+patterns when they are genuinely present.
+
+Important Note
+--------------
+No honest model can guarantee 100% on hidden labels without either a deterministic target
+relationship, train/test leakage intentionally provided by the organisers, or access to the
+true hidden target. The solution is designed to maximise the legitimate signal in the given
+files while avoiding target leakage inside local validation.
