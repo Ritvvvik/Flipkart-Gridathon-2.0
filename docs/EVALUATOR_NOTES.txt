@@ -1,0 +1,32 @@
+Evaluator Notes
+===============
+
+Files Provided
+--------------
+* src/traffic_demand_solution.py: end-to-end training and submission script.
+* requirements.txt: Python dependencies.
+* docs/APPROACH.txt: explanation of the modelling approach.
+* docs/METHODS_USED.txt: detailed methods, features, models, and validation.
+
+How to Run
+----------
+1. Place train.csv, test.csv, and sample_submission.csv inside a folder named dataset/.
+2. Install dependencies:
+
+       pip install -r requirements.txt
+
+3. Generate predictions and the validation report:
+
+       python src/traffic_demand_solution.py --data-dir dataset --output submission.csv --cv-report cv_report.csv
+
+Expected Outputs
+----------------
+* submission.csv: file to upload to the competition platform.
+* cv_report.csv: fold-wise R2 values for each model and overall model rows.
+
+Fairness and Leakage Control
+----------------------------
+The code does not use hidden labels. Target encoding for training validation rows is
+computed out-of-fold, so local validation does not train on the row it is scoring. The test
+set uses encodings derived from all available training labels, which is standard for final
+competition submissions.
